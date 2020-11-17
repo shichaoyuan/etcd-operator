@@ -205,14 +205,12 @@ func (c *Cluster) run() {
 			running, pending, err := c.pollPods()
 			if err != nil {
 				c.logger.Errorf("fail to poll pods: %v", err)
-				reconcileFailed.WithLabelValues("failed to poll pods").Inc()
 				continue
 			}
 
 			if len(pending) > 0 {
 				// Pod startup might take long, e.g. pulling image. It would deterministically become running or succeeded/failed later.
 				c.logger.Infof("skip reconciliation: running (%v), pending (%v)", k8sutil.GetPodNames(running), k8sutil.GetPodNames(pending))
-				reconcileFailed.WithLabelValues("not all pods are running").Inc()
 				continue
 			}
 			if len(running) == 0 {
@@ -239,11 +237,9 @@ func (c *Cluster) run() {
 				c.logger.Warningf("periodic update CR status failed: %v", err)
 			}
 
-			reconcileHistogram.WithLabelValues(c.name()).Observe(time.Since(start).Seconds())
 		}
 
 		if rerr != nil {
-			reconcileFailed.WithLabelValues(rerr.Error()).Inc()
 		}
 
 		if isFatalError(rerr) {
@@ -281,8 +277,8 @@ func isSpecEqual(s1, s2 api.ClusterSpec) bool {
 
 func (c *Cluster) startSeedMember() error {
 	m := &etcdutil.Member{
-		Name:         k8sutil.UniqueMemberName(c.cluster.Name),
-		Namespace:    c.cluster.Namespace,
+		Name:      k8sutil.UniqueMemberName(c.cluster.Name),
+		Namespace: c.cluster.Namespace,
 	}
 	if c.cluster.Spec.Pod != nil {
 		m.ClusterDomain = c.cluster.Spec.Pod.ClusterDomain
